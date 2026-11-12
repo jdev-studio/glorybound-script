@@ -1,0 +1,70 @@
+local lp = game.Players.LocalPlayer
+local R = game.ReplicatedStorage.Remotes
+local strText = lp.PlayerGui.LobbyHUD.Root.LobbyHUD.LeftColumn.Chips.Strength.Row.Text
+local MACHINE = lp:GetAttribute("Training")
+if type(MACHINE) ~= "string" or MACHINE == "" then MACHINE = "B10" end
+local BATCH, INTERVAL = 3, 0.5
+
+local function num(s)
+	local n, suf = s:gsub(",", ""):match("([%d%.]+)%s*(%a?)")
+	n = tonumber(n) or 0
+	local mult = ({ K = 1e3, M = 1e6, B = 1e9, T = 1e12 })[(suf or ""):upper()] or 1
+	return n * mult
+end
+
+local function atCap()
+	local ok, t = pcall(function() return strText.Text end)
+	if not ok or type(t) ~= "string" then return false end
+	local a, b = t:match("^(.-)%s*/%s*(.-)$")
+	return a and b and num(b) > 0 and num(a) >= num(b)
+end
+
+local function findMachine()
+	for _, d in ipairs(workspace.Lobby.Gym:GetDescendants()) do
+		if d.Name == MACHINE and d:IsA("Model") then return d end
+	end
+end
+
+local function sitDown()
+	local m = findMachine()
+	local prompt = m and m:FindFirstChild("Prompt")
+	if not prompt then return end
+	R.TravelTo:FireServer("Gym")
+	task.wait(1.5)
+	for _ = 1, 5 do
+		pcall(function() lp.Character.HumanoidRootPart.Position = prompt.Position end)
+		task.wait(0.6)
+		pcall(fireproximityprompt, prompt.TrainPrompt)
+		task.wait(0.6)
+		if lp:GetAttribute("Training") == MACHINE then return true end
+	end
+end
+
+local function rebirth()
+	local before = lp:GetAttribute("Rebirth")
+	R.TrainStop:FireServer()
+	task.wait(0.4)
+	R.TravelTo:FireServer("Rebirth")
+	task.wait(1.5)
+	R.Rebirth:FireServer()
+	task.wait(2)
+	print("[AutoGym] rebirth", before, "->", lp:GetAttribute("Rebirth"))
+	sitDown()
+end
+
+local VERSION = "0.1.0"
+_G.AutoGymStop = false
+_G.AutoGymRun = (_G.AutoGymRun or 0) + 1
+local runId = _G.AutoGymRun
+print("[AutoGym] loaded v" .. VERSION .. ", training on " .. MACHINE)
+while not _G.AutoGymStop and _G.AutoGymRun == runId do
+	if atCap() then
+		rebirth()
+	elseif lp:GetAttribute("Training") ~= MACHINE then
+		sitDown()
+	else
+		R.TrainRep:FireServer(BATCH)
+	end
+	task.wait(INTERVAL)
+end
+print("[AutoGym] stopped")

@@ -29,13 +29,16 @@ local function sitDown()
 	local m = findMachine()
 	local prompt = m and m:FindFirstChild("Prompt")
 	if not prompt then return end
-	R.TravelTo:FireServer("Gym")
-	task.wait(1.5)
+	local ok, dist = pcall(function() return (lp.Character.HumanoidRootPart.Position - prompt.Position).Magnitude end)
+	if not ok or dist > 20 then
+		R.TravelTo:FireServer("Gym")
+		task.wait(1.5)
+	end
 	for _ = 1, 5 do
 		pcall(function() lp.Character.HumanoidRootPart.Position = prompt.Position end)
-		task.wait(0.6)
+		task.wait(1.5)
 		pcall(fireproximityprompt, prompt.TrainPrompt)
-		task.wait(0.6)
+		task.wait(1)
 		if lp:GetAttribute("Training") == MACHINE then return true end
 	end
 end
@@ -52,7 +55,7 @@ local function rebirth()
 	sitDown()
 end
 
-local VERSION = "0.1.0"
+local VERSION = "0.1.1"
 _G.AutoGymStop = false
 _G.AutoGymRun = (_G.AutoGymRun or 0) + 1
 local runId = _G.AutoGymRun
